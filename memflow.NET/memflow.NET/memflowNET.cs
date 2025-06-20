@@ -1034,6 +1034,54 @@ namespace memflowNET
         {
             return addressToRelativeOffset + ReadUInt32(addressToRelativeOffset) + 0x4;
         }
+        
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        private static unsafe byte ModuleInfoCallbackShim(void* ctx, ModuleInfo info)
+        {
+            return Methods.cb_collect_dynamic_ModuleInfo((CollectBase*)ctx, info) ? (byte)1 : (byte)0;
+        }
+        
+        public unsafe MFprocessmodule[] GetAllModules()
+        {
+            const int capacity = 64;
+            nuint bufferSize = (nuint)(capacity * sizeof(ModuleInfo));
+            sbyte* buffer = (sbyte*)NativeMemory.Alloc(bufferSize);
+
+            try
+            {
+                var collector = new CollectBase
+                {
+                    buf = buffer,
+                    size = 0,
+                    capacity = capacity
+                };
+
+                var callback = new Callback_c_void__ModuleInfo
+                {
+                    context = &collector,
+                    func = (delegate* unmanaged[Cdecl]<void*, ModuleInfo, byte>)&ModuleInfoCallbackShim
+                };
+
+                var proc = (IntoProcessInstance_CBox_c_void_____CArc_c_void*)this._process;
+                int res = proc->vtbl_process->module_list_callback(&proc->container, null, callback);
+                if (res != 0)
+                    throw new InvalidOperationException("module_list_callback failed");
+
+                var result = new MFprocessmodule[(int)collector.size];
+                var ptr = (ModuleInfo*)collector.buf;
+                for (int i = 0; i < (int)collector.size; i++)
+                {
+                    string name = Marshal.PtrToStringAnsi(new IntPtr(ptr[i].name)) ?? "unknown";
+                    result[i] = new MFprocessmodule(ptr[i].@base, (uint)ptr[i].size, name);
+                }
+
+                return result;
+            }
+            finally
+            {
+                NativeMemory.Free(buffer);
+            }
+        }
 
         /// <summary>
         /// Destructor
