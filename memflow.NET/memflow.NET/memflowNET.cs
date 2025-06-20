@@ -54,6 +54,8 @@ namespace memflowNET
         /// If device is FPGA, in which case dropping inventory crashes memflow.
         /// </summary>
         private bool _IsFpga;
+        
+        private static bool logInitialized = false;
 
         /// <summary>
         /// Connects to memflow using the provided connector.
@@ -69,9 +71,7 @@ namespace memflowNET
                 throw new PlatformNotSupportedException("Only 64 bit systems are supported.");
 
             // check for root/admin privilege
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && ShellHelper.Bash($"id -u {Environment.UserName}") != "0")
-                throw new UnauthorizedAccessException("Must be started as root.");
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator) != true)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator) != true) 
                 throw new UnauthorizedAccessException("Must be started as administrator.");
 
             // set logger
@@ -81,7 +81,11 @@ namespace memflowNET
                 PrintLog = Logger;
 
             // enable debug level logging
-            Methods.mf_log_init((LevelFilter)loglevel);
+            if (!logInitialized)
+            {
+                Methods.mf_log_init((LevelFilter)loglevel);
+                logInitialized = true;
+            }
             this._loglevel = loglevel;
 
             // load all available plugins
