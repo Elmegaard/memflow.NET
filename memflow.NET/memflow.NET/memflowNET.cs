@@ -10,6 +10,14 @@ using memflowNET.Interop;
 /// </summary>
 namespace memflowNET
 {
+    public struct MemoryRange
+    {
+        public ulong Start;
+        public ulong Size;
+        public byte PageType;
+    }
+
+
     /// <summary>
     /// A memflow connection to a VM.
     /// </summary>
@@ -48,13 +56,15 @@ namespace memflowNET
         /// <summary>
         /// Internal keyboard.
         /// </summary>
-        private readonly CGlueTraitObj_CBox_c_void_____KeyboardVtbl_CGlueObjContainer_CBox_c_void_____CArc_c_void_____KeyboardRetTmp_CArc_c_void______________CArc_c_void_____KeyboardRetTmp_CArc_c_void* _keyboard;
+        private readonly
+            CGlueTraitObj_CBox_c_void_____KeyboardVtbl_CGlueObjContainer_CBox_c_void_____CArc_c_void_____KeyboardRetTmp_CArc_c_void______________CArc_c_void_____KeyboardRetTmp_CArc_c_void
+            * _keyboard;
 
         /// <summary>
         /// If device is FPGA, in which case dropping inventory crashes memflow.
         /// </summary>
         private bool _IsFpga;
-        
+
         private static bool logInitialized = false;
 
         /// <summary>
@@ -65,13 +75,15 @@ namespace memflowNET
         /// <param name="monitorKeyboard">If the keyboard inside the VM should be monitored for button presses.</param>
         /// <param name="loglevel">The logging level of memflow.</param>
         /// <param name="logging">The logging action that takes a single string as parameter.</param>
-        public unsafe MFconnection(string connector, string connectorArgs = "", bool monitorKeyboard = false, int loglevel = 1, Action<string>? logging = null)
+        public unsafe MFconnection(string connector, string connectorArgs = "", bool monitorKeyboard = false,
+            int loglevel = 1, Action<string>? logging = null)
         {
             if (!Environment.Is64BitProcess || IntPtr.Size != 8)
                 throw new PlatformNotSupportedException("Only 64 bit systems are supported.");
 
             // check for root/admin privilege
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator) != true) 
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator) != true)
                 throw new UnauthorizedAccessException("Must be started as administrator.");
 
             // set logger
@@ -86,6 +98,7 @@ namespace memflowNET
                 Methods.mf_log_init((LevelFilter)loglevel);
                 logInitialized = true;
             }
+
             this._loglevel = loglevel;
 
             // load all available plugins
@@ -94,7 +107,9 @@ namespace memflowNET
                 PrintLog($"### Inventory initialized: 0x{(IntPtr)this._inventory:X}");
 
             // alloc connector struct
-            this._connector = (ConnectorInstance_CBox_c_void_____CArc_c_void*) Marshal.AllocCoTaskMem(sizeof(ConnectorInstance_CBox_c_void_____CArc_c_void));
+            this._connector =
+                (ConnectorInstance_CBox_c_void_____CArc_c_void*)Marshal.AllocCoTaskMem(
+                    sizeof(ConnectorInstance_CBox_c_void_____CArc_c_void));
 
             if (connector == "pcileech" && connectorArgs.ToUpper().Contains("FPGA"))
                 this._IsFpga = true;
@@ -112,17 +127,21 @@ namespace memflowNET
                     return;
                 }
             }
+
             if (loglevel > 2)
                 PrintLog($"### Connector initialized: 0x{(IntPtr)(*this._connector).container.instance.instance:X}");
 
             // alloc OS Plugin struct
-            this._osPlugin = (OsInstance_CBox_c_void_____CArc_c_void*) Marshal.AllocCoTaskMem(sizeof(OsInstance_CBox_c_void_____CArc_c_void));
+            this._osPlugin =
+                (OsInstance_CBox_c_void_____CArc_c_void*)Marshal.AllocCoTaskMem(
+                    sizeof(OsInstance_CBox_c_void_____CArc_c_void));
 
             // initialize the OS plugin
             bName = Array.ConvertAll(Encoding.ASCII.GetBytes("win32\0"), b => unchecked((sbyte)b));
             fixed (sbyte* osName = &bName[0], osArgs = &bArgs[0])
             {
-                if (Methods.mf_inventory_create_os(this._inventory, osName, osArgs, this._connector, this._osPlugin) != 0)
+                if (Methods.mf_inventory_create_os(this._inventory, osName, osArgs, this._connector, this._osPlugin) !=
+                    0)
                 {
                     PrintLog("### Unable to initialize OS plugin 'win32'");
                     return;
@@ -132,7 +151,11 @@ namespace memflowNET
             if (monitorKeyboard)
             {
                 // alloc keyboard struct
-                this._keyboard = (CGlueTraitObj_CBox_c_void_____KeyboardVtbl_CGlueObjContainer_CBox_c_void_____CArc_c_void_____KeyboardRetTmp_CArc_c_void______________CArc_c_void_____KeyboardRetTmp_CArc_c_void*) Marshal.AllocCoTaskMem(sizeof(CGlueTraitObj_CBox_c_void_____KeyboardVtbl_CGlueObjContainer_CBox_c_void_____CArc_c_void_____KeyboardRetTmp_CArc_c_void______________CArc_c_void_____KeyboardRetTmp_CArc_c_void));
+                this._keyboard =
+                    (CGlueTraitObj_CBox_c_void_____KeyboardVtbl_CGlueObjContainer_CBox_c_void_____CArc_c_void_____KeyboardRetTmp_CArc_c_void______________CArc_c_void_____KeyboardRetTmp_CArc_c_void
+                        *)Marshal.AllocCoTaskMem(
+                        sizeof(
+                            CGlueTraitObj_CBox_c_void_____KeyboardVtbl_CGlueObjContainer_CBox_c_void_____CArc_c_void_____KeyboardRetTmp_CArc_c_void______________CArc_c_void_____KeyboardRetTmp_CArc_c_void));
                 // initialize keyboard
                 int res = Methods.mf_osinstance_keyboard(this._osPlugin, this._keyboard);
                 if (res < 0)
@@ -172,6 +195,7 @@ namespace memflowNET
                 if (this._loglevel > 2)
                     PrintLog("### Connector freed");
             }
+
             // dropping inventory on a FPGA device crashes memflow, so we skip it for now
             if (!this._IsFpga)
                 Methods.mf_inventory_free(this._inventory);
@@ -191,7 +215,7 @@ namespace memflowNET
             // get kernel module (driver)
             ModuleInfo moduleInfo = new();
             byte[] bName = Encoding.ASCII.GetBytes(modulName);
-            fixed (byte* cName = &bName[0]) 
+            fixed (byte* cName = &bName[0])
             {
                 CSliceRef_u8 processSearch = new()
                 {
@@ -207,11 +231,12 @@ namespace memflowNET
             }
 
             // get process that imports the driver
-            var proc = (ProcessInstance_CBox_c_void_____CArc_c_void*) Marshal.AllocCoTaskMem(sizeof(ProcessInstance_CBox_c_void_____CArc_c_void));
+            var proc = (ProcessInstance_CBox_c_void_____CArc_c_void*)Marshal.AllocCoTaskMem(
+                sizeof(ProcessInstance_CBox_c_void_____CArc_c_void));
             if (!procName.ToLower().EndsWith(".exe"))
                 procName += ".exe";
             bName = Encoding.ASCII.GetBytes(procName);
-            fixed (byte* cName = &bName[0]) 
+            fixed (byte* cName = &bName[0])
             {
                 CSliceRef_u8 processSearch = new()
                 {
@@ -230,20 +255,22 @@ namespace memflowNET
             // get import of said driver from process
             ImportInfo importInfo = new();
             bName = Encoding.ASCII.GetBytes(functionName);
-            fixed (byte* cName = &bName[0]) 
+            fixed (byte* cName = &bName[0])
             {
                 CSliceRef_u8 functionSearch = new()
                 {
                     data = cName,
                     len = (uint)functionName.Length
                 };
-                if (Interop.Methods.mf_processinstance_module_import_by_name(proc, &moduleInfo, functionSearch, &importInfo) != 0)
+                if (Interop.Methods.mf_processinstance_module_import_by_name(proc, &moduleInfo, functionSearch,
+                        &importInfo) != 0)
                 {
                     if (this._loglevel > 0)
                         PrintLog($"### Function Import '{functionName}' could not be found!");
                     return 0;
                 }
             }
+
             return importInfo.offset;
         }
 
@@ -379,7 +406,9 @@ namespace memflowNET
             }
 
             // alloc process struct
-            this._process = (ProcessInstance_CBox_c_void_____CArc_c_void*)Marshal.AllocCoTaskMem(sizeof(ProcessInstance_CBox_c_void_____CArc_c_void));
+            this._process =
+                (ProcessInstance_CBox_c_void_____CArc_c_void*)Marshal.AllocCoTaskMem(
+                    sizeof(ProcessInstance_CBox_c_void_____CArc_c_void));
 
             // define search
             string procName = processName;
@@ -421,9 +450,11 @@ namespace memflowNET
                     PrintLog("### Process main module could not be found!");
                 return;
             }
+
             this.MainModule = new MFprocessmodule(mainModule.@base, (uint)mainModule.size, this.Name);
             if (this._loglevel > 2)
-                PrintLog($"### Process found: 0x{this.MainModule.BaseAddress:X} | {this.MainModule.Size / 1024} kiB | {this.PId} | {this.Name} | {this.Path}");
+                PrintLog(
+                    $"### Process found: 0x{this.MainModule.BaseAddress:X} | {this.MainModule.Size / 1024} kiB | {this.PId} | {this.Name} | {this.Path}");
 
             // allocate read/write buffer
             this._rwBuffer = (byte*)NativeMemory.AllocZeroed(4096);
@@ -431,7 +462,7 @@ namespace memflowNET
             this._osPlugin = connection._osPlugin;
             this.Success = true;
         }
-        
+
         /// <summary>
         /// Gets a process inside the VM by PId.
         /// </summary>
@@ -448,7 +479,9 @@ namespace memflowNET
             }
 
             // alloc process struct
-            this._process = (ProcessInstance_CBox_c_void_____CArc_c_void*) Marshal.AllocCoTaskMem(sizeof(ProcessInstance_CBox_c_void_____CArc_c_void));
+            this._process =
+                (ProcessInstance_CBox_c_void_____CArc_c_void*)Marshal.AllocCoTaskMem(
+                    sizeof(ProcessInstance_CBox_c_void_____CArc_c_void));
 
             // find a specific process based on its Id
             if (Methods.mf_osinstance_process_by_pid(connection._osPlugin, (uint)processId, this._process) != 0)
@@ -460,7 +493,7 @@ namespace memflowNET
                     PrintLog($"### Process Id'{processId}' could not be found!");
                 return;
             }
-            
+
             // get process infos
             ProcessInfo* info = Methods.mf_processinstance_info(this._process);
             this.Address = (*info).address;
@@ -468,7 +501,7 @@ namespace memflowNET
             this.Name = GetCStringFromPtr((*info).name);
             this.Path = GetCStringFromPtr((*info).path);
             this.Commandline = GetCStringFromPtr((*info).command_line);
-            
+
             // get main module
             ModuleInfo mainModule = new();
             if (Methods.mf_processinstance_primary_module(this._process, &mainModule) != 0)
@@ -477,9 +510,11 @@ namespace memflowNET
                     PrintLog("### Process main module could not be found!");
                 return;
             }
+
             this.MainModule = new MFprocessmodule(mainModule.@base, (uint)mainModule.size, this.Name);
             if (this._loglevel > 2)
-                PrintLog($"### Process found: 0x{this.MainModule.BaseAddress:X} | {this.MainModule.Size / 1024} kiB | {this.PId} | {this.Name} | {this.Path}");
+                PrintLog(
+                    $"### Process found: 0x{this.MainModule.BaseAddress:X} | {this.MainModule.Size / 1024} kiB | {this.PId} | {this.Name} | {this.Path}");
 
             // allocate read/write buffer
             this._rwBuffer = (byte*)NativeMemory.AllocZeroed(4096);
@@ -502,6 +537,7 @@ namespace memflowNET
                 if (*(ptr + i) == (byte)0x00)
                     return Encoding.ASCII.GetString((byte*)ptr, i);
             }
+
             return "";
         }
 
@@ -528,6 +564,7 @@ namespace memflowNET
                     return new MFprocessmodule(0, 0, "INVALID");
                 }
             }
+
             return new MFprocessmodule(moduleInfo.@base, (uint)moduleInfo.size, GetCStringFromPtr(moduleInfo.name));
         }
 
@@ -563,6 +600,7 @@ namespace memflowNET
                     PrintLog($"### Failed to read data from 0x{address:X}!");
                 return false;
             }
+
             return true;
         }
 
@@ -586,6 +624,7 @@ namespace memflowNET
                     PrintLog($"### Failed to read data from 0x{address:X}!");
                 return false;
             }
+
             return true;
         }
 
@@ -627,6 +666,7 @@ namespace memflowNET
                     if (this._loglevel > 1)
                         PrintLog($"### Failed to read data from 0x{address:X}!");
                 }
+
                 return ba;
             }
         }
@@ -785,6 +825,7 @@ namespace memflowNET
                     return encoding.GetString(this._rwBuffer, i);
                 //return new string((sbyte*)this._rwBuffer); // DANGER! this will create a buffer-overflow if no null-terminator is present
             }
+
             return encoding.GetString(this._rwBuffer, (int)maxLength);
         }
 
@@ -808,6 +849,7 @@ namespace memflowNET
                     PrintLog($"### Failed to write data to 0x{address:X}!");
                 return false;
             }
+
             return true;
         }
 
@@ -831,6 +873,7 @@ namespace memflowNET
                     PrintLog($"### Failed to write data to 0x{address:X}!");
                 return false;
             }
+
             return true;
         }
 
@@ -869,6 +912,7 @@ namespace memflowNET
                         PrintLog($"### Failed to write data to 0x{address:X}!");
                     return false;
                 }
+
                 return true;
             }
         }
@@ -1006,7 +1050,7 @@ namespace memflowNET
             byte[] str = encoding.GetBytes(data);
             if (encoding.IsSingleByte)
             {
-                byte[] terminatedStr = new byte[str.Length + 1];   // string byte representation + 00 terminator
+                byte[] terminatedStr = new byte[str.Length + 1]; // string byte representation + 00 terminator
                 Unsafe.CopyBlockUnaligned(ref terminatedStr[0], ref str[0], (uint)str.Length);
                 return WriteBytes(address, terminatedStr);
             }
@@ -1034,54 +1078,6 @@ namespace memflowNET
         {
             return addressToRelativeOffset + ReadUInt32(addressToRelativeOffset) + 0x4;
         }
-        
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        private static unsafe byte ModuleInfoCallbackShim(void* ctx, ModuleInfo info)
-        {
-            return Methods.cb_collect_dynamic_ModuleInfo((CollectBase*)ctx, info) ? (byte)1 : (byte)0;
-        }
-        
-        public unsafe MFprocessmodule[] GetAllModules()
-        {
-            const int capacity = 64;
-            nuint bufferSize = (nuint)(capacity * sizeof(ModuleInfo));
-            sbyte* buffer = (sbyte*)NativeMemory.Alloc(bufferSize);
-
-            try
-            {
-                var collector = new CollectBase
-                {
-                    buf = buffer,
-                    size = 0,
-                    capacity = capacity
-                };
-
-                var callback = new Callback_c_void__ModuleInfo
-                {
-                    context = &collector,
-                    func = (delegate* unmanaged[Cdecl]<void*, ModuleInfo, byte>)&ModuleInfoCallbackShim
-                };
-
-                var proc = (IntoProcessInstance_CBox_c_void_____CArc_c_void*)this._process;
-                int res = proc->vtbl_process->module_list_callback(&proc->container, null, callback);
-                if (res != 0)
-                    throw new InvalidOperationException("module_list_callback failed");
-
-                var result = new MFprocessmodule[(int)collector.size];
-                var ptr = (ModuleInfo*)collector.buf;
-                for (int i = 0; i < (int)collector.size; i++)
-                {
-                    string name = Marshal.PtrToStringAnsi(new IntPtr(ptr[i].name)) ?? "unknown";
-                    result[i] = new MFprocessmodule(ptr[i].@base, (uint)ptr[i].size, name);
-                }
-
-                return result;
-            }
-            finally
-            {
-                NativeMemory.Free(buffer);
-            }
-        }
 
         /// <summary>
         /// Destructor
@@ -1095,8 +1091,54 @@ namespace memflowNET
                 if (this._loglevel > 2)
                     PrintLog("### Process freed");
             }
+
             if (this.Success)
                 NativeMemory.Free(this._rwBuffer);
+        }
+
+        public unsafe List<MemoryRange> GetMemoryMap()
+        {
+            var result = new List<MemoryRange>();
+
+            CollectBase collector = new()
+            {
+                size = 0,
+                capacity = 0,
+                buf = null
+            };
+
+            delegate* unmanaged[Cdecl]<void*, CTup3_Address__umem__PageType, byte> cb_func = &Methods.cb_collect_dynamic_MemoryRange_wrapper;
+            Callback_c_void__MemoryRange cb = new Callback_c_void__MemoryRange
+            {
+                context = &collector,
+                func = cb_func
+            };
+            
+            // Call into virtual translation map
+            var proc = (IntoProcessInstance_CBox_c_void_____CArc_c_void*)_process;
+            
+            if (proc->vtbl_virtualtranslate == null)
+                throw new NullReferenceException("vtbl_virtualtranslate is null");
+
+            if (proc == null)
+                throw new NullReferenceException("proc is null");
+            
+            Methods.mf_processinstance_virt_page_map(_process, -1, cb);
+
+            var ptr = (CTup3_Address__umem__PageType*)collector.buf;
+
+            for (UIntPtr i = 0; i < collector.size; i++)
+            {
+                result.Add(new MemoryRange
+                {
+                    Start = ptr[i]._0,
+                    Size = ptr[i]._1,
+                    PageType = ptr[i]._2
+                });
+            }
+
+            NativeMemory.Free(collector.buf);
+            return result;
         }
     }
 

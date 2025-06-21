@@ -3688,6 +3688,20 @@ namespace memflowNET.Interop
         {
             return cb_collect_dynamic_base(ctx, unchecked((uint)sizeof(CTup3_Address__umem__PageType)), &info);
         }
+        
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        public static unsafe byte cb_collect_dynamic_MemoryRange_wrapper(void* ctx, CTup3_Address__umem__PageType range)
+        {
+            return (byte)(cb_collect_dynamic_MemoryRange((CollectBase*)ctx, range) ? 1 : 0);
+        }
+        
+                
+        [DllImport("libmemflow_ffi", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void mf_processinstance_virt_page_map(
+            IntPtr process,
+            long gap_size,
+            Callback_c_void__MemoryRange callback
+        );
 
         public static bool cb_count_MemoryRange([NativeTypeName("size_t *")] nuint* cnt, [NativeTypeName("MemoryRange")] CTup3_Address__umem__PageType info)
         {
