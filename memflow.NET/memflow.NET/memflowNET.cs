@@ -654,21 +654,35 @@ namespace memflowNET
         public byte[] ReadBytesUncapped(ulong address, uint length)
         {
             byte[] ba = new byte[length];
-            fixed (byte* ptr = &ba[0])
+            if (_process == null || address == 0 || length == 0)
             {
-                CSliceMut_u8 cBytes = new()
-                {
-                    data = ptr,
-                    len = (nuint)length
-                };
-                if (Methods.mf_processinstance_read_raw_into(this._process, address, cBytes) != 0)
-                {
-                    if (this._loglevel > 1)
-                        PrintLog($"### Failed to read data from 0x{address:X}!");
-                }
-
                 return ba;
             }
+
+            try
+            {
+                fixed (byte* ptr = &ba[0])
+                {
+                    CSliceMut_u8 cBytes = new()
+                    {
+                        data = ptr,
+                        len = (nuint)length
+                    };
+                    if (Methods.mf_processinstance_read_raw_into(this._process, address, cBytes) != 0)
+                    {
+                        if (this._loglevel > 1)
+                            PrintLog($"### Failed to read data from 0x{address:X}!");
+                    }
+
+                    return ba;
+                }
+            }
+            catch (SEHException ex)
+            {
+                PrintLog(ex.Message);
+            }
+
+            return ba;
         }
 
         /// <summary>
@@ -1107,22 +1121,23 @@ namespace memflowNET
                 buf = null
             };
 
-            delegate* unmanaged[Cdecl]<void*, CTup3_Address__umem__PageType, byte> cb_func = &Methods.cb_collect_dynamic_MemoryRange_wrapper;
+            delegate* unmanaged[Cdecl]<void*, CTup3_Address__umem__PageType, byte> cb_func =
+                &Methods.cb_collect_dynamic_MemoryRange_wrapper;
             Callback_c_void__MemoryRange cb = new Callback_c_void__MemoryRange
             {
                 context = &collector,
                 func = cb_func
             };
-            
+
             // Call into virtual translation map
             var proc = (IntoProcessInstance_CBox_c_void_____CArc_c_void*)_process;
-            
+
             if (proc->vtbl_virtualtranslate == null)
                 throw new NullReferenceException("vtbl_virtualtranslate is null");
 
             if (proc == null)
                 throw new NullReferenceException("proc is null");
-            
+
             Methods.mf_processinstance_virt_page_map(_process, -1, cb);
 
             var ptr = (CTup3_Address__umem__PageType*)collector.buf;
